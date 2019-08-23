@@ -5,17 +5,24 @@ public class Controller: NSObject, CalculatorViewDelegate, CalculatorViewDataSou
     var displayText = "0"
     var num: String = String()
     var operationSign: String = String()
+    var isDot = false
     
     typealias Operation = (Double, Double) -> Double
     
     public func calculatorView(_ calculatorView: CalculatorView, didPress key: CalculatorKey) {
         switch key {
-        case .number(_), .dot:
-            //Is First Number //key.rawValue != "." First Number 0.7, 0.9, 0.3
-            if operationSign.isEmpty && displayText == "0" && key.rawValue != "." {
+        case .number(_):
+            //Is First Number
+            if operationSign.isEmpty && displayText == "0" {
                 displayText = key.rawValue
+                isDot = false
             } else {
                 displayText += key.rawValue
+            }
+        case .dot:
+            if !isDot {
+                displayText += key.rawValue
+                isDot = true
             }
         case .add, .subtract, .multiply, .divide:
             if let _ = Double(displayText) {
@@ -25,6 +32,7 @@ public class Controller: NSObject, CalculatorViewDelegate, CalculatorViewDataSou
             }
             operationSign = key.rawValue
             displayText = ""
+            isDot = false
         case .percent:
             num = ""
             operationSign = "%"
@@ -43,9 +51,9 @@ public class Controller: NSObject, CalculatorViewDelegate, CalculatorViewDataSou
                 }
             }
         case .clear:
+            operationSign = ""
             displayText = "0"
             num = ""
-            operationSign = ""
         case .equal:
             if !num.isEmpty && !operationSign.isEmpty, let _ = Double(displayText) {
                 //let _ = Double(displayText) vor chkarena mi qani nshan irar hetevic gri
@@ -75,7 +83,7 @@ public class Controller: NSObject, CalculatorViewDelegate, CalculatorViewDataSou
         return displayText
     }
     
-    //MARK: -Private Interface
+    //MARK: -Private Func
     
     private func determineTheType() {
         if num.hasSuffix(".0") {
