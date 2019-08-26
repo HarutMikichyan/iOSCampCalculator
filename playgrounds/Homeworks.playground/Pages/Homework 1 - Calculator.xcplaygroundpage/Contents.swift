@@ -1,79 +1,90 @@
 import PlaygroundSupport
 import UIKit
 
+extension CalculatorKey {
+    var function: ((Double, Double) -> Double)? {
+        switch self {
+        case .add: return { $0 + $1 }
+        case .subtract: return { $0 - $1 }
+        case .multiply: return { $0 * $1 }
+        case .divide: return { $0 / $1 }
+        default: return nil
+        }
+    }
+}
+
 public class Controller: NSObject, CalculatorViewDelegate, CalculatorViewDataSource {
     var displayText = "0"
-    var num: String = String()
-    var operationSign: String = String()
     var isDot = false
-    
-    typealias Operation = (Double, Double) -> Double
-    
+    var isSecondValue = false
+    var operation: CalculatorKey = .undefined
+    var firstValue: Double?
+
     public func calculatorView(_ calculatorView: CalculatorView, didPress key: CalculatorKey) {
         switch key {
-        case .number(_):
-            //Is First Number
-            if operationSign.isEmpty && displayText == "0" {
+        case .number:
+            if operation != .undefined && !isSecondValue {
+                guard let _ = firstValue else { return }
+                displayText = ""
+                isSecondValue = true
+            }
+            
+            if displayText == "0" {
                 displayText = key.rawValue
                 isDot = false
             } else {
                 displayText += key.rawValue
             }
         case .dot:
-            if !isDot {
-                displayText += key.rawValue
-                isDot = true
-            }
+            guard !isDot else { return }
+            displayText += key.rawValue
+            isDot = true
         case .add, .subtract, .multiply, .divide:
-            if let _ = Double(displayText) {
-                num = displayText
-            } else {
-                num = displayText + "." + "0"
+            guard let displayTextValue = Double(displayText) else {
+                return // Do some error handling here
             }
-            operationSign = key.rawValue
-            displayText = ""
+            
+            if firstValue != nil, operation != .undefined {
+                firstValue = eval()
+                operation = .undefined
+                displayText = String(firstValue!).hasSuffix(".0") ? String(String(firstValue!).dropLast(2)) : String(firstValue!)
+            }
+            firstValue = displayTextValue
+            operation = key
+            isSecondValue = false
             isDot = false
         case .percent:
-            num = ""
-            operationSign = "%"
-            displayText = ""
-            displayText += key.rawValue
+            guard let secondValue = Double(displayText) else { return }
+            if firstValue != nil, operation != .undefined {
+                firstValue = eval()
+                firstValue = firstValue! / 100.0
+                displayText = String(firstValue!)
+                operation = .undefined
+            } else if firstValue == nil {
+                firstValue = secondValue / 100.0
+                displayText = String(firstValue!)
+                operation = .undefined
+            }
         case .toggleSign:
             if displayText != "0", let doubleDisplayText = Double(displayText) {
-                var copyDisplayText = String(-1.0 * doubleDisplayText)
-                
+                let copyDisplayText = String(-1.0 * doubleDisplayText)
+
                 if let _ = Int(displayText) {
-                    copyDisplayText.removeLast()
-                    copyDisplayText.removeLast()
-                    displayText = copyDisplayText
+                    displayText = String(copyDisplayText.dropLast(2))
                 } else {
                     displayText = copyDisplayText
                 }
             }
         case .clear:
-            operationSign = ""
+            isDot = false
             displayText = "0"
-            num = ""
+            operation = .undefined
+            firstValue = nil
         case .equal:
-            if !num.isEmpty && !operationSign.isEmpty, let _ = Double(displayText) {
-                //let _ = Double(displayText) vor chkarena mi qani nshan irar hetevic gri
-                switch operationSign {
-                case "+":
-                    evaluate(op1: Double(num)!, op2: Double(displayText)!, operation: +)
-                case "-":
-                    evaluate(op1: Double(num)!, op2: Double(displayText)!, operation: -)
-                case "×":
-                    evaluate(op1: Double(num)!, op2: Double(displayText)!, operation: *)
-                case "÷":
-                    evaluate(op1: Double(num)!, op2: Double(displayText)!, operation: /)
-                default:
-                    fatalError()
-                }
-            } else if num.isEmpty && operationSign == "%" { //"%" qnarkum es gorcuxutyan deepq@
-                displayText.removeFirst()
-                num = String(Double(displayText)!/100.0)
-                determineTheType()
-            }
+            guard let _ = Double(displayText), operation != .undefined, firstValue != nil else { return }
+            firstValue = eval()
+            displayText = String(firstValue!).hasSuffix(".0") ? String(String(firstValue!).dropLast(2)) : String(firstValue!)
+            operation = .undefined
         default:
             break
         }
@@ -83,25 +94,13 @@ public class Controller: NSObject, CalculatorViewDelegate, CalculatorViewDataSou
         return displayText
     }
     
-    //MARK: -Private Func
+    //MARK: -Private Method
     
-    private func determineTheType() {
-        if num.hasSuffix(".0") {
-            displayText = num
-            displayText.removeLast()
-            displayText.removeLast()
-        } else {
-            displayText = num
+    private func eval() -> Double {
+        guard let op2 = Double(displayText), let function = operation.function else {
+            preconditionFailure("Couldn't get a numerical value from string.")
         }
-    }
-    
-    private func evaluate(op1: Double, op2: Double, operation: Operation) {
-        guard let _ = Double(displayText) else {
-            return
-        }
-
-        num = String(operation(op1,op2))
-        determineTheType()
+        return function(firstValue!, op2)
     }
 }
 
